@@ -41,7 +41,9 @@ def store_chunks_in_chroma(collection, chunks: list):
         meta = {
             "page_number": int(c["metadata"]["page_number"]),
             "char_start": int(c["metadata"]["char_start"]),
-            "char_end": int(c["metadata"]["char_end"])
+            "char_end": int(c["metadata"]["char_end"]),
+            "chunk_type": str(c["metadata"].get("chunk_type", "text")),
+            "structured_json": str(c["metadata"].get("structured_json", "{}"))
         }
         metadatas.append(meta)
         
@@ -55,14 +57,30 @@ def store_chunks_in_chroma(collection, chunks: list):
 def query_chroma(collection, query_text: str, n_results: int = 3) -> dict:
     """
     Queries the Chroma collection for the semantically closest text chunks.
-    
-    Returns a dictionary containing:
-        - 'documents': list of retrieved chunk texts
-        - 'metadatas': list of metadata dicts
-        - 'distances': distance scores (lower means more similar)
     """
     results = collection.query(
         query_texts=[query_text],
         n_results=n_results
     )
     return results
+
+class TenderDatabase:
+    def __init__(self):
+        self.client = get_chroma_client()
+        self.collection = get_or_create_collection(self.client)
+
+    def clear_database(self):
+        """
+        Clears the current tender requirements collection.
+        """
+        try:
+            self.client.delete_collection("tender_requirements")
+        except Exception:
+            pass
+        self.collection = get_or_create_collection(self.client)
+
+    def add_chunks(self, chunks: list):
+        """
+        Ingests the generated chunks into the Chroma collection.
+        """
+        store_chunks_in_chroma(self.collection, chunks)

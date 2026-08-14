@@ -29,7 +29,32 @@ class BM25:
         text = text.replace("e.m.d.", "emd")
         
         words = re.findall(r'\b\w+\b', text)
-        return [w for w in words if w not in STOP_WORDS]
+        # Expand abbreviations and synonyms for better matching
+        expanded_words = []
+        for w in words:
+            expanded_words.append(w)
+            if w == "number":
+                expanded_words.append("no")
+            elif w == "no":
+                expanded_words.append("number")
+            elif w == "bidder":
+                expanded_words.append("tenderer")
+            elif w == "tenderer":
+                expanded_words.append("bidder")
+            elif w == "bid":
+                expanded_words.append("tender")
+            elif w == "tender":
+                expanded_words.append("bid")
+            elif w == "bids":
+                expanded_words.append("tenders")
+            elif w == "tenders":
+                expanded_words.append("bids")
+            elif w == "gst":
+                expanded_words.append("gstin")
+            elif w == "gstin":
+                expanded_words.append("gst")
+                
+        return [w for w in expanded_words if w not in STOP_WORDS]
 
     def fit(self, chunks: list):
         """

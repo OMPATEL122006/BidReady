@@ -7,11 +7,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.retriever import TenderRetriever
 
 FAILED_QUESTIONS = [
-    "What is the NIT number?",
-    "When is the eligibility bid scheduled to be opened?",
-    "What is the date of the NIT?",
-    "What are the acceptable forms of EMD?",
-    "When is the financial cover opened?"
+    "Where is the work located?",
+    "Which government department does the tender belong to?",
+    "What type of tender is this?",
+    "Under what condition is the Integrity Pact required?"
 ]
 
 def format_explanation(cand: dict) -> str:

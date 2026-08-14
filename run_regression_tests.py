@@ -7,80 +7,173 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.retriever import TenderRetriever
 from src import config
 
-# Define the regression test suite of 14 problematic/verification questions
-# Maps Question -> List of acceptable correct page numbers containing the actual answer
+# Define the comprehensive regression test suite of 22 key/problematic questions
 REGRESSION_TESTS = [
+    # Level 1 — Direct factual retrieval
+    {
+        "q_idx": 1,
+        "question": "What is the name of the work?",
+        "expected_pages": [1, 2, 3, 19, 26, 102]
+    },
+    {
+        "q_idx": 2,
+        "question": "Where is the work located?",
+        "expected_pages": [15, 19, 26, 102]
+    },
     {
         "q_idx": 3,
         "question": "What is the NIT number?",
-        "expected_pages": [1, 3, 12] # NIT No. : 17/AE/PCSD/LKO/26-27 is on pages 1, 3, and 12
+        "expected_pages": [1, 3, 12]
+    },
+    {
+        "q_idx": 4,
+        "question": "What is the estimated cost of the tender?",
+        "expected_pages": [1, 2, 12, 19, 28, 104]
     },
     {
         "q_idx": 8,
-        "question": "What is the EMD amount?",
-        "expected_pages": [1, 3, 28] # Rs. 4,163/- is on pages 1, 3, and 28
+        "question": "What is the Earnest Money Deposit amount?",
+        "expected_pages": [1, 3, 28]
     },
     {
         "q_idx": 9,
         "question": "What is the period of completion?",
-        "expected_pages": [1, 3, 19] # 01 (One) Month is on pages 1, 3, and 19
+        "expected_pages": [1, 3, 19]
     },
     {
         "q_idx": 10,
-        "question": "What is the last date and time for submission?",
-        "expected_pages": [1, 3, 13] # 20.08.2026 upto 11.00 hrs is on pages 1, 3, and 13
+        "question": "What is the last date and time for submission of the bid?",
+        "expected_pages": [1, 3, 13, 26]
     },
     {
         "q_idx": 11,
         "question": "When is the eligibility bid scheduled to be opened?",
-        "expected_pages": [14, 26] # Opened on 21.08.2026 at 11.00 hrs is on pages 14 and 26
+        "expected_pages": [14, 26]
+    },
+    {
+        "q_idx": 12,
+        "question": "Who is inviting the tender?",
+        "expected_pages": [12, 26]
+    },
+    {
+        "q_idx": 13,
+        "question": "Which government department does the tender belong to?",
+        "expected_pages": [1, 9, 12, 26]
+    },
+    {
+        "q_idx": 15,
+        "question": "What type of tender is this?",
+        "expected_pages": [12, 26]
+    },
+    {
+        "q_idx": 16,
+        "question": "What is the tender submission portal?",
+        "expected_pages": [7]
     },
     {
         "q_idx": 17,
         "question": "What is the date of the NIT?",
-        # The NIT does not have a formal publication date printed, but page 13 mentions 14.08.2026 and page 12 mentions original date
         "expected_pages": [12, 13]
+    },
+    {
+        "q_idx": 18,
+        "question": "Who is the Assistant Engineer mentioned in the tender?",
+        "expected_pages": [2, 3, 19, 26, 27]
+    },
+    {
+        "q_idx": 19,
+        "question": "Which Postal Civil Division is handling this tender?",
+        "expected_pages": [1, 11, 12, 26]
+    },
+    {
+        "q_idx": 20,
+        "question": "What is the SH/head work?",
+        "expected_pages": [1, 2, 19]
+    },
+    {
+        "q_idx": 21,
+        "question": "What types of contractors are allowed to submit bids?",
+        "expected_pages": [12]
     },
     {
         "q_idx": 24,
         "question": "What is the required period within which similar works must have been completed?",
-        "expected_pages": [12, 17] # Last 7 years is mentioned on pages 12 and 17
+        "expected_pages": [12, 17]
     },
     {
         "q_idx": 27,
-        "question": "What does 'similar work' mean?",
-        "expected_pages": [12] # Definition is explicitly on page 12
+        "question": "What does the tender mean by 'similar work'?",
+        "expected_pages": [12]
     },
     {
-        "q_idx": 34,
-        "question": "What can a bidder submit if they do not have GST registration?",
-        "expected_pages": [11] # GST undertaking text is on page 11
-    },
-    {
-        "q_idx": 41,
-        "question": "What are the acceptable forms of EMD?",
-        "expected_pages": [10, 13, 14] # Forms (DD, FDR, BG, etc.) are detailed on pages 10, 13, and 14
-    },
-    {
-        "q_idx": 48,
-        "question": "What is the validity period of the bank guarantee portion of the EMD?",
-        "expected_pages": [10, 14] # 180 days or more is on pages 10 and 14
-    },
-    {
-        "q_idx": 62,
-        "question": "When is the financial cover opened?",
-        "expected_pages": [11, 17, 21] # "at a later date" or "at notified time" on pages 11, 17, and 21
-    },
-    # Verification questions that were correct but had low scores
-    {
-        "q_idx": 20,
-        "question": "What is the SH/head work?",
-        "expected_pages": [1, 2, 19] # Dismantaling of cycle stand and store is on pages 1, 2, and 19
+        "q_idx": 28,
+        "question": "Which government organizations are mentioned as acceptable clients for similar works?",
+        "expected_pages": [12, 13]
     },
     {
         "q_idx": 31,
         "question": "What happens if back-to-back execution is discovered?",
-        "expected_pages": [12, 26] # Debarred forever or forfeiture of EMD/PG on pages 12 and 26
+        "expected_pages": [12, 26]
+    },
+    {
+        "q_idx": 34,
+        "question": "What can a bidder submit if they do not have GST registration?",
+        "expected_pages": [11]
+    },
+    {
+        "q_idx": 37,
+        "question": "Under what condition is the Integrity Pact required?",
+        "expected_pages": [36]
+    },
+    {
+        "q_idx": 38,
+        "question": "What documents must be uploaded as part of the eligibility cover?",
+        "expected_pages": [11, 17]
+    },
+    {
+        "q_idx": 40,
+        "question": "What is Form D used for?",
+        "expected_pages": [17]
+    },
+    {
+        "q_idx": 41,
+        "question": "What are the acceptable forms of EMD?",
+        "expected_pages": [10, 11, 13, 14]
+    },
+    {
+        "q_idx": 47,
+        "question": "What is the minimum portion of EMD that must be deposited in the prescribed form when using a bank guarantee?",
+        "expected_pages": [14]
+    },
+    {
+        "q_idx": 48,
+        "question": "What is the required validity period of the bank guarantee portion of the EMD?",
+        "expected_pages": [10, 14]
+    },
+    {
+        "q_idx": 54,
+        "question": "What percentage performance guarantee is mentioned in the tender?",
+        "expected_pages": [9, 14, 28]
+    },
+    {
+        "q_idx": 62,
+        "question": "When is the financial cover opened?",
+        "expected_pages": [11, 17, 21]
+    },
+    {
+        "q_idx": 64,
+        "question": "What happens if the uploaded documents do not match the physical documents submitted by the lowest bidder?",
+        "expected_pages": [14, 15]
+    },
+    {
+        "q_idx": 68,
+        "question": "What happens if a bidder makes a post-tender modification outside the permitted process?",
+        "expected_pages": [13]
+    },
+    {
+        "q_idx": 69,
+        "question": "How long must the tender remain open for acceptance?",
+        "expected_pages": [9, 15, 21]
     }
 ]
 
@@ -96,7 +189,7 @@ def run_tests():
     # 1. Initialize retriever
     retriever = TenderRetriever()
     
-    # 2. Run Baseline (Without Reranker)
+    # 2. Run Baseline (Reranker Disabled)
     print("\n--- Running Baseline (Reranker Disabled) ---")
     config.USE_RERANKER = False
     retriever.reranker.enabled = False
@@ -125,7 +218,7 @@ def run_tests():
             "top3_ok": is_top3_ok
         })
         
-    # 3. Run Optimized (With Reranker if available)
+    # 3. Run Optimized (Reranker Enabled)
     print("\n--- Running Optimized (Reranker Enabled) ---")
     config.USE_RERANKER = True
     retriever.reranker.__init__() # Reload reranker

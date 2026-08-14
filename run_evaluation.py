@@ -4,8 +4,8 @@ import sys
 # Add current directory to path to resolve src imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.database import get_chroma_client, get_or_create_collection, query_chroma
-from db_experiment import compute_keyword_score, compute_phrase_boost
+from src.retriever import TenderRetriever
+from run_regression_tests import REGRESSION_TESTS
 
 # List of 70 evaluation questions provided by the user
 QUESTIONS = [
@@ -89,50 +89,26 @@ QUESTIONS = [
 ]
 
 def run_evaluation():
-    print("--- Starting RAG Evaluation ---")
-    client = get_chroma_client()
-    collection = get_or_create_collection(client, "tender_requirements")
-    
-    # Check if collection is empty
-    if collection.count() == 0:
-        print("Error: The Chroma collection is empty. Run db_experiment.py first to parse the PDF.")
-        sys.exit(1)
+    # Force stdout to UTF-8
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
         
+    print("--- Starting Optimized RAG Evaluation (70 Questions) ---")
+    retriever = TenderRetriever()
+    
     results_list = []
     
     for idx, query in enumerate(QUESTIONS):
         print(f"Evaluating Question {idx + 1}/{len(QUESTIONS)}: {query}")
         
-        # Query top 50 candidates
-        res = query_chroma(collection, query, n_results=50)
+        # Retrieve scored candidates in debug mode to extract component scores
+        candidates = retriever.retrieve(query, debug=True)
         
-        documents = res["documents"][0]
-        metadatas = res["metadatas"][0]
-        distances = res["distances"][0]
-        
-        # Score and re-rank candidates
-        scored_candidates = []
-        for doc, meta, dist in zip(documents, metadatas, distances):
-            sim = 1.0 - max(0.0, min(1.0, dist))
-            key_score = compute_keyword_score(query, doc)
-            phrase_boost = compute_phrase_boost(query, doc)
-            hybrid_score = 0.5 * sim + 0.5 * key_score + phrase_boost
-            
-            scored_candidates.append({
-                "doc": doc,
-                "meta": meta,
-                "dist": dist,
-                "score": hybrid_score
-            })
-            
-        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
-        
-        # Save the top candidate
-        if scored_candidates:
+        if candidates:
             results_list.append({
                 "q_idx": idx + 1,
                 "question": query,
-                "top_result": scored_candidates[0]
+                "top_result": candidates[0]
             })
         else:
             results_list.append({
@@ -141,20 +117,20 @@ def run_evaluation():
                 "top_result": None
             })
             
-    # Write the results to a markdown artifact file
+    # Write report to markdown artifact file
     artifact_dir = "C:\\Users\\OMPATELL\\.gemini\\antigravity-ide\\brain\\b0bfca34-4791-48d5-b377-2fda0f334191"
     os.makedirs(artifact_dir, exist_ok=True)
     report_path = os.path.join(artifact_dir, "evaluation_results.md")
     
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write("# BidReady RAG Evaluation Report\n\n")
-        f.write("This report lists the retrieval results for the 70 standard evaluation questions run against the custom line-aware hybrid retrieval engine.\n\n")
+        f.write("# BidReady Optimized RAG Evaluation Report\n\n")
+        f.write("This report lists the retrieval results for the 70 standard evaluation questions run against the **Optimized Retrieval Engine** (Vector + BM25 + Phrase Boost + Domain Intent Boost + Cross-Encoder Reranker).\n\n")
         
         # Summary table
         f.write("## Retrieval Performance Summary\n\n")
-        f.write("| Category | Description |\n")
-        f.write("| --- | --- |\n")
-        f.write("| **Total Questions** | 70 |\n")
+        f.write("| Category | Score Range | Count |\n")
+        f.write("| --- | --- | --- |\n")
+        f.write("| **Total Questions** | N/A | 70 |\n")
         
         strong_matches = 0
         moderate_matches = 0
@@ -162,17 +138,17 @@ def run_evaluation():
         
         for r in results_list:
             if r["top_result"]:
-                score = r["top_result"]["score"]
-                if score > 0.65:
+                conf = r["top_result"]["confidence"]
+                if "🟢" in conf:
                     strong_matches += 1
-                elif score > 0.45:
+                elif "🟡" in conf:
                     moderate_matches += 1
                 else:
                     weak_matches += 1
                     
-        f.write(f"| **Strong Matches (Score > 0.65)** | {strong_matches} |\n")
-        f.write(f"| **Moderate Matches (0.45 - 0.65)** | {moderate_matches} |\n")
-        f.write(f"| **Weak Matches (Score < 0.45)** | {weak_matches} |\n\n")
+        f.write(f"| **High Confidence Matches (🟢 HIGH CONFIDENCE)** | Reranker > 0.1 & Passed Validation | {strong_matches} |\n")
+        f.write(f"| **Medium Confidence Matches (🟡 MEDIUM CONFIDENCE)** | Reranker <= 0.1 & Passed Validation | {moderate_matches} |\n")
+        f.write(f"| **Low Confidence Matches (🔴 LOW CONFIDENCE)** | Failed Validation (Fallback) | {weak_matches} |\n\n")
         
         f.write("## Detailed Results\n\n")
         
@@ -182,20 +158,20 @@ def run_evaluation():
                 res = r["top_result"]
                 score = res["score"]
                 dist = res["dist"]
-                meta = res["meta"]
-                doc = res["doc"]
-                
-                if score > 0.65:
-                    label = "🟢 STRONG MATCH"
-                elif score > 0.45:
-                    label = "🟡 MODERATE MATCH"
-                else:
-                    label = "🔴 WEAK MATCH"
+                meta = res["metadata"]
+                doc = res["text"]
+                label = res["confidence"]
                     
                 f.write(f"*   **Status:** {label}\n")
-                f.write(f"*   **Hybrid Score:** `{score:.4f}` (Dist: `{dist:.4f}`)\n")
+                f.write(f"*   **Final Combined Score:** `{score:.4f}`\n")
+                f.write(f"    *   *Reranker Score:* `{res['rerank_score']:.4f}`\n")
+                f.write(f"    *   *BM25 Score:* `{res['bm25_score']:.4f}` (Normalized: `{res['norm_bm25']:.4f}`)\n")
+                f.write(f"    *   *Vector Sim (1-Dist):* `{res['sim']:.4f}` (Raw Dist: `{dist:.4f}`)\n")
+                f.write(f"    *   *Phrase Boost:* `{res['phrase_boost']:.4f}`\n")
+                f.write(f"    *   *Domain Intent Boost:* `{res['domain_boost']:.4f}`\n")
+                f.write(f"    *   *Validation Penalty:* `{res.get('validation_penalty', 0.0):.4f}`\n")
                 f.write(f"*   **Location:** Page `{meta['page_number']}`\n")
-                f.write(f"*   **Retrieved Text:**\n")
+                f.write(f"*   **Retrieved Evidence Text:**\n")
                 f.write(f"    > \"{doc}\"\n\n")
             else:
                 f.write("*   **Status:** 🔴 NO RESULTS RETRIEVED\n\n")
