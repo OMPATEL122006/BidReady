@@ -30,3 +30,5 @@ search_results.txt
 Tender_AI_Project_Context.md
 run_diagnostics.py
 .env
+
+outputs/

@@ -1,9 +1,15 @@
 import os
 
 # Base paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TENDERS_DIR = os.path.join(BASE_DIR, "Tenders")
-DB_DIR = os.path.join(BASE_DIR, "chroma_db")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+TENDERS_DIR = os.path.join(DATA_DIR, "Tenders")
+if not os.path.exists(TENDERS_DIR):
+    TENDERS_DIR = os.path.join(BASE_DIR, "Tenders")
+
+DB_DIR = os.path.join(DATA_DIR, "chroma_db")
+if not os.path.exists(DB_DIR):
+    DB_DIR = os.path.join(BASE_DIR, "chroma_db")
 
 # Chunking configurations
 DEFAULT_CHUNK_SIZE = 600
@@ -14,11 +20,11 @@ EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 # Reranker configurations (Cross-Encoder)
 USE_RERANKER = True
-RERANKER_MODEL_NAME = "BAAI/bge-reranker-base"
-CANDIDATE_POOL_SIZE = 25
+RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+CANDIDATE_POOL_SIZE = 20
 
 # BM25 configurations
-BM25_INDEX_PATH = os.path.join(BASE_DIR, "bm25_index.json")
+BM25_INDEX_PATH = os.path.join(DATA_DIR, "bm25_index.json")
 STOP_WORDS = {"what", "is", "the", "of", "for", "this", "do", "we", "need", "in", "a", "an", "to", "how", "much", "are", "on", "at", "by"}
 
 # Try to load environment variables from .env file if present at root
@@ -33,4 +39,4 @@ if os.path.exists(env_file):
 
 # LLM configurations (Groq)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-DEFAULT_LLM_MODEL = "llama-3.1-8b-instant"  # standard fast, free-tier model on Groq
+DEFAULT_LLM_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
