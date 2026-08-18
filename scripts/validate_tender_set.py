@@ -33,7 +33,7 @@ def run_tender_set_validation(files: List[str], mode_label: str = "MODE B: Multi
     summary_file = os.path.join(output_dir, "tender_set_validation_summary.md")
     report_file = os.path.join(output_dir, "tender_set_validation_report.txt")
 
-    print(f"\n[EVAL] Running 70-Question Diagnostic Audit on Tender Set '{tender_id}'...")
+    print(f"\n[EVAL] Running 70-Question Ground-Truth Diagnostic Audit on Tender Set '{tender_id}'...")
     start_time = time.time()
 
     high_c = 0
@@ -63,7 +63,7 @@ def run_tender_set_validation(files: List[str], mode_label: str = "MODE B: Multi
         print(f"[{idx}/70] Auditing: {question[:45]}...", flush=True)
         top10_results = pipeline.search_engine.search(question, n_results=10, tender_id=tender_id)
         results = top10_results[:3]
-        
+
         # Check conflict
         query_model = pipeline.search_engine.query_expander.expand_query(question)
         from app.conflict.conflict_detector import ConflictDetector
@@ -85,10 +85,16 @@ def run_tender_set_validation(files: List[str], mode_label: str = "MODE B: Multi
             else:
                 low_c += 1
 
-        # Determine evidence rank for benchmark metrics
+        # Ground-truth evidence rank verification in Top 10
         correct_rank = None
         for r_i, r in enumerate(top10_results, 1):
-            if "🟢" in r.confidence or "🟡" in r.confidence:
+            is_ans, ev_conf = pipeline.search_engine.validator.evaluate_answerability(
+                query=question,
+                requested_attribute=query_model.requested_attribute,
+                doc_text=r.chunk.text,
+                score=r.combined_score
+            )
+            if is_ans and ("🟢" in ev_conf or "🟡" in ev_conf):
                 correct_rank = r_i
                 break
 
@@ -100,7 +106,7 @@ def run_tender_set_validation(files: List[str], mode_label: str = "MODE B: Multi
             hits_top5 += 1
         if correct_rank and correct_rank <= 10:
             hits_top10 += 1
-        
+
         if correct_rank:
             reciprocal_ranks.append(1.0 / correct_rank)
         else:
@@ -140,18 +146,21 @@ def run_tender_set_validation(files: List[str], mode_label: str = "MODE B: Multi
     rec5 = (hits_top5 / total_q) * 100
     rec10 = (hits_top10 / total_q) * 100
     mrr = sum(reciprocal_ranks) / total_q if total_q > 0 else 0.0
+    not_found_top10 = total_q - hits_top10
 
     md_header = []
     md_header.append("# Multi-Document Tender Set Validation Report\n")
     md_header.append(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}  ")
     md_header.append(f"**Tender ID:** `{tender_id}`  ")
     md_header.append(f"**Documents Audited ({len(files)}):** {', '.join([os.path.basename(f) for f in files])}  \n")
-    md_header.append("### 🎯 Retrieval Benchmark Metrics")
+    md_header.append("### 🎯 Ground-Truth Retrieval Benchmark Metrics")
     md_header.append(f"- **Recall@1:** `{rec1:.1f}%` ({hits_top1}/{total_q})")
     md_header.append(f"- **Recall@3:** `{rec3:.1f}%` ({hits_top3}/{total_q})")
     md_header.append(f"- **Recall@5:** `{rec5:.1f}%` ({hits_top5}/{total_q})")
     md_header.append(f"- **Recall@10:** `{rec10:.1f}%` ({hits_top10}/{total_q})")
-    md_header.append(f"- **Mean Reciprocal Rank (MRR):** `{mrr:.4f}`  \n")
+    md_header.append(f"- **Mean Reciprocal Rank (MRR):** `{mrr:.4f}`")
+    md_header.append(f"- **Correct Evidence Found in Top-5:** `{hits_top5} / {total_q}`")
+    md_header.append(f"- **Correct Evidence NOT Found in Top-10:** `{not_found_top10} / {total_q}`  \n")
     md_header.append(f"**Confidence Summary:** 🟢 High: {high_c} | 🟡 Medium: {med_c} | ⚠️ Conflicts: {conflict_c} | 🔴 Low/Unsupported: {low_c}  \n")
     md_header.append("## 70-Question Multi-Document Retrieval & Conflict Matrix\n")
     md_header.append("| Q# | Audit Question | Confidence / Conflict | Top Evidence Snippet | Source Citation & Document Type |")
@@ -164,8 +173,9 @@ def run_tender_set_validation(files: List[str], mode_label: str = "MODE B: Multi
     with open(report_file, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
 
-    print(f"\n[DONE] Diagnostic Validation finished in {elapsed:.1f}s!")
+    print(f"\n[DONE] Ground-Truth Validation finished in {elapsed:.1f}s!")
     print(f"Recall@1: {rec1:.1f}% | Recall@3: {rec3:.1f}% | Recall@5: {rec5:.1f}% | Recall@10: {rec10:.1f}% | MRR: {mrr:.4f}")
+    print(f"Evidence in Top-5: {hits_top5}/{total_q} | NOT in Top-10: {not_found_top10}/{total_q}")
     print(f"High: {high_c} | Medium: {med_c} | Conflicts: {conflict_c} | Low: {low_c}")
     print(f"Summary written to: {summary_file}")
     print(f"Detailed report written to: {report_file}")
