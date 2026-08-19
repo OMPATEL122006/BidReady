@@ -101,7 +101,11 @@ class EvidenceValidator:
             return False, self.NEGATIVE
 
         if self._is_security_deposit(q):
-            if "security deposit" in d:
+            has_sd_action = bool(re.search(
+                r'(?:security\s*deposit[^\.\n;]*?(?:refund|release|return|deduct|retain|forfeit|percentage|\d+%|validity|period))|(?:(?:refund|release|return|deduct|retain|forfeit)[^\.\n;]*?security\s*deposit)',
+                d
+            ))
+            if has_sd_action:
                 return True, self.POSITIVE
             return False, self.NEGATIVE
 
@@ -169,36 +173,11 @@ class EvidenceValidator:
                 return True, self.POSITIVE
             return False, self.NEGATIVE
 
-        # Generic factual fallback.
-        # Require multiple meaningful query concepts AND a concrete answer entity.
-        q_terms = self._meaningful_terms(q)
-
-        if len(q_terms) < 2:
-            return False, self.NEGATIVE
-
-        matched = sum(1 for term in q_terms if term in d)
-
-        concrete = (
-            self._has_percentage(d)
-            or self._has_currency(d)
-            or self._has_date_or_deadline(d)
-            or self._has_duration(d)
-            or self._has_any(d, [
-                "required",
-                "mandatory",
-                "allowed",
-                "not allowed",
-                "permitted",
-                "prohibited",
-                "shall be",
-                "is",
-                "are",
-            ])
-        )
-
-        if matched >= min(3, len(q_terms)) and concrete:
-            return True, self.PARTIAL
-
+        # -----------------------------------------------------
+        # EXPERIMENT:
+        # Generic factual fallback is disabled for this experiment
+        # to eliminate Category-B false positives. Unmapped queries return NEGATIVE.
+        # -----------------------------------------------------
         return False, self.NEGATIVE
 
     # ---------------------------------------------------------

@@ -168,16 +168,14 @@ class AnswerabilityValidator:
             return {"status": "NO", "reason": "Evidence does not contain EMD amount or percentage."}
 
         # 7. Period of Completion (Q20)
-        if "completion" in q_clean or "execution time" in q_clean or "period of completion" in q_clean:
+        if ("period of completion" in q_clean or "execution time" in q_clean or "time allowed for completion" in q_clean or ("completion" in q_clean and any(x in q_clean for x in ["period", "duration", "time"]) and not any(x in q_clean for x in ["defect", "security", "liability", "certificate", "payment", "bill"]))):
             has_completion_period = bool(re.search(
-                r'completed\s*within\s*\d+\s*(?:days?|months?|weeks?)|period\s*of\s*completion\s*:\s*\d+\s*(?:days?|months?|weeks?)|within\s*\d+\s*days?\s*of',
+                r'completed\s*within\s*\d+\s*(?:days?|months?|weeks?)|period\s*of\s*completion\s*(?::|\s)*\d+\s*(?:days?|months?|weeks?)|time\s*allowed\s*for\s*completion|within\s*\d+\s*days?\s*of',
                 d_clean
             ))
             if has_completion_period:
                 return {"status": "YES", "reason": "Evidence explicitly states the time allowed for completion of work."}
-            elif "completion" in d_clean or "liquidate damage" in d_clean:
-                return {"status": "PARTIAL", "reason": "Evidence discusses completion or delay damages but does not state the explicit completion duration."}
-            return {"status": "NO", "reason": "Evidence discusses turnover or general conditions but lacks completion period."}
+            return {"status": "NO", "reason": "Evidence lacks explicit completion period duration."}
 
         # 8. Contact Phone Number (Q67)
         if "phone" in q_clean or "mobile" in q_clean or "contact number" in q_clean:
@@ -193,21 +191,10 @@ class AnswerabilityValidator:
                 return {"status": "YES", "reason": "Evidence explicitly contains an official email address."}
             return {"status": "NO", "reason": "Evidence lacks an official email address."}
 
-        # 10. General Question Fallback
-        # Checks if key query nouns/verbs match AND evidence contains a factual figure or requirement statement
-        stopwords = {
-            "what", "is", "the", "of", "for", "this", "do", "we", "need", "in", "a", "an", "to",
-            "how", "much", "are", "on", "at", "by", "or", "and", "be", "with", "from", "which",
-            "required", "applicable", "allowed", "details", "submitted", "when", "where", "who", "any"
-        }
-        q_words = [w for w in q_clean.split() if w not in stopwords and len(w) > 2]
-        matched_words = [w for w in q_words if w in d_clean]
-
-        has_fact = bool(re.search(r'\b\d+(?:\.\d+)?%?\b|(?:rs\.?|₹)\s*\d+|\b(?:days|months|years|lakh|crore|nil|exempted|draft|cheque|submitted|mandatory|shall)\b', d_clean))
-
-        if len(matched_words) >= 3 and has_fact:
-            return {"status": "YES", "reason": "Evidence directly supports the question with matching keywords and factual figures/requirements."}
-        elif len(matched_words) >= 2:
-            return {"status": "PARTIAL", "reason": "Evidence discusses the query topic but lacks explicit factual answer details."}
-        else:
-            return {"status": "NO", "reason": "Evidence does not contain the required factual answer for this question."}
+        # -----------------------------------------------------
+        # EXPERIMENT:
+        # Rule #10 General Question Fallback is intentionally disabled for this experiment
+        # to eliminate Category-B false positives. Queries not matched by a specific
+        # intent rule return status NO.
+        # -----------------------------------------------------
+        return {"status": "NO", "reason": "No specific intent rule matched for this query."}

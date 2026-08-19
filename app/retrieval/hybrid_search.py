@@ -1,3 +1,4 @@
+import math
 import re
 from typing import List, Dict, Any, Optional
 
@@ -9,6 +10,7 @@ from app.retrieval.query_expander import QueryExpander
 from app.retrieval.exact_search import ExactSearchMatcher
 from app.retrieval.reranker import CrossEncoderReranker
 from app.retrieval.context_expander import ContextExpander
+from app.retrieval.answerability_validator import AnswerabilityValidator
 from app.retrieval.evidence_validator import EvidenceValidator
 from app.config.settings import CANDIDATE_POOL_SIZE
 
@@ -26,7 +28,7 @@ class HybridSearchEngine:
         self.query_expander = QueryExpander()
         self.exact_matcher = ExactSearchMatcher()
         self.reranker = CrossEncoderReranker()
-        self.validator = EvidenceValidator()
+        self.validator = AnswerabilityValidator()
 
     def search(
         self,
@@ -147,10 +149,6 @@ class HybridSearchEngine:
         if not rerank_scores:
             rerank_scores = [0.0] * len(candidate_list)
 
-        min_rr = min(rerank_scores)
-        max_rr = max(rerank_scores)
-        rr_range = max(max_rr - min_rr, 1e-9)
-
         max_bm25 = max(
             [x["bm25"] for x in candidate_list],
             default=1.0,
@@ -180,16 +178,13 @@ class HybridSearchEngine:
                 text,
             )
 
-            rr_norm = (
-                rerank_scores[i] - min_rr
-            ) / rr_range
-
-            # Retrieval relevance ONLY.
-            retrieval_score = (
-                0.50 * rr_norm
-                + 0.30 * bm25_norm
-                + 0.20 * exact
-            )
+            # -----------------------------------------------------
+            # EXPERIMENT:
+            # final_score = reranker_score (RAW cross-encoder score directly)
+            # Unnormalized. No exact score, BM25, domain boost, BOQ penalty, or validator in final ranking.
+            # -----------------------------------------------------
+            raw_rr_score = rerank_scores[i]
+            retrieval_score = raw_rr_score
 
             # -----------------------------------------------------
             # 4. Independent evidence gate
@@ -204,19 +199,7 @@ class HybridSearchEngine:
                 )
             )
 
-            # -----------------------------------------------------
-            # CRITICAL:
-            #
-            # Answerability does NOT get mixed into retrieval score.
-            #
-            # A highly relevant but non-answering chunk stays
-            # NON-ANSWERABLE.
-            # -----------------------------------------------------
-
-            final_score = retrieval_score
-
-            if not answerable:
-                final_score -= 0.75
+            final_score = raw_rr_score
 
             chunk = Chunk(
                 chunk_id=cand["chunk_id"],
