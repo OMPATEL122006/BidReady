@@ -34,10 +34,6 @@ class QueryExpander:
             target_type = "GENERAL"
             requested_attribute = "emd_mode"
             preferred_doc_types = ["NIT", "DETAILED_TENDER"]
-        elif any(k in q_lower for k in ["schedule", "critical dates"]):
-            target_type = "DATE_TIME"
-            requested_attribute = "critical_dates"
-            preferred_doc_types = ["NIT", "CORRIGENDUM", "DETAILED_TENDER"]
         elif any(k in q_lower for k in ["completion", "execution time", "time allowed"]):
             target_type = "DATE_TIME"
             requested_attribute = "completion_period"
@@ -58,10 +54,6 @@ class QueryExpander:
             target_type = "CONSEQUENCE"
             requested_attribute = "joint_venture_policy"
             preferred_doc_types = ["DETAILED_TENDER", "NIT"]
-        elif any(k in q_lower for k in ["blacklisting", "affidavit", "debarred"]):
-            target_type = "CONSEQUENCE"
-            requested_attribute = "non_blacklisting"
-            preferred_doc_types = ["NIT", "DETAILED_TENDER"]
         elif any(k in q_lower for k in ["boq", "item", "quantity", "unit rate", "dsr"]):
             target_type = "BOQ"
             requested_attribute = "boq_item_quantity"
@@ -70,15 +62,6 @@ class QueryExpander:
         # Generic term expansions
         if "emd" in q_lower or "earnest money" in q_lower or "bid security" in q_lower:
             sub_queries.extend(["Earnest Money Deposit", "EMD amount", "Demand Draft EMD", "Bid Security"])
-
-        if "mode" in q_lower or "form" in q_lower or "drawn" in q_lower:
-            sub_queries.extend(["Demand Draft", "in favour of", "bankers cheque", "online payment"])
-
-        if "schedule" in q_lower or "critical dates" in q_lower:
-            sub_queries.extend(["schedule of dates", "key dates", "publish date submission date opening date"])
-
-        if "blacklisting" in q_lower or "affidavit" in q_lower:
-            sub_queries.extend(["non-blacklisting undertaking", "not blacklisted", "affidavit declaration"])
 
         if "completion" in q_lower or "period of completion" in q_lower:
             sub_queries.extend(["completion period", "execution period", "completed within", "time allowed"])

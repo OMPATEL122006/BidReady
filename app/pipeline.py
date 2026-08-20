@@ -28,14 +28,10 @@ class TenderRAGPipeline:
         self.tender_sets: Dict[str, TenderDocumentSet] = {}
 
     def _generate_doc_id(self, file_path: str) -> str:
-        """Collision-safe document ID using file content size, mtime, and path hash."""
         fname = os.path.basename(file_path)
-        stat = os.stat(file_path) if os.path.exists(file_path) else None
-        seed = f"{file_path}_{stat.st_size}_{stat.st_mtime}" if stat else file_path
-        return hashlib.md5(seed.encode("utf-8")).hexdigest()[:12]
+        return hashlib.md5(fname.encode("utf-8")).hexdigest()[:12]
 
     def _generate_tender_id(self, identifier: str) -> str:
-        """Collision-safe tender set ID."""
         return "tset_" + hashlib.md5(identifier.encode("utf-8")).hexdigest()[:10]
 
     def ingest_file(
@@ -43,15 +39,14 @@ class TenderRAGPipeline:
         file_path: str,
         document_id: Optional[str] = None,
         tender_id: Optional[str] = None,
-        override_doc_type: Optional[DocumentType] = None,
-        fit_bm25: bool = True
+        override_doc_type: Optional[DocumentType] = None
     ) -> str:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
 
         fname = os.path.basename(file_path)
         doc_id = document_id or self._generate_doc_id(file_path)
-        t_id = tender_id or self._generate_tender_id(file_path)
+        t_id = tender_id or "default_tender"
         ext = os.path.splitext(file_path)[1].lower()
 
         logger.info(f"Ingesting file '{fname}' (tender_id: {t_id}, doc_id: {doc_id})...")
@@ -79,9 +74,7 @@ class TenderRAGPipeline:
         self.indexed_chunks.extend(chunks)
 
         self.vector_store.store_chunks(chunks)
-
-        if fit_bm25:
-            self.bm25_store.fit(self.indexed_chunks)
+        self.bm25_store.fit(self.indexed_chunks)
 
         logger.info(f"Successfully ingested '{fname}' [{doc_type.value}]: generated {len(chunks)} chunks.")
         return doc_id
@@ -90,7 +83,6 @@ class TenderRAGPipeline:
         """
         Ingests multiple related documents (NIT, Detailed Tender, BOQ, Corrigendum)
         under a single logical TenderDocumentSet with strict boundary isolation.
-        BM25 index is fitted ONCE after all files in the set are chunked.
         """
         if isinstance(files_or_dir, str) and os.path.isdir(files_or_dir):
             target_dir = files_or_dir
@@ -105,11 +97,7 @@ class TenderRAGPipeline:
         logger.info(f"Ingesting Tender Set '{t_id}' ({len(files)} files)...")
 
         for fp in files:
-            self.ingest_file(fp, tender_id=t_id, fit_bm25=False)
-
-        # Batch fit BM25 ONCE after all tender files are chunked
-        self.bm25_store.fit(self.indexed_chunks)
-        logger.info(f"BM25 index successfully fitted on total {len(self.indexed_chunks)} chunks for tender set '{t_id}'.")
+            self.ingest_file(fp, tender_id=t_id)
 
         return t_id
 
@@ -120,10 +108,8 @@ class TenderRAGPipeline:
         doc_ids = []
         files = [os.path.join(dir_path, f) for f in os.listdir(dir_path) if f.lower().endswith((".pdf", ".xlsx", ".xls"))]
         for fp in files:
-            d_id = self.ingest_file(fp, fit_bm25=False)
+            d_id = self.ingest_file(fp)
             doc_ids.append(d_id)
-
-        self.bm25_store.fit(self.indexed_chunks)
         return doc_ids
 
     def ask(self, query: str, n_results: int = 3, document_id: Optional[str] = None, tender_id: Optional[str] = None) -> Dict[str, Any]:
@@ -135,3 +121,4 @@ class TenderRAGPipeline:
         self.bm25_store.fit([])
         self.tender_sets = {}
         logger.info("Pipeline database and indices cleared.")
+
